@@ -1,9 +1,6 @@
 package io.github.d_sch.webfluxcommon.operators;
 
 import java.util.Arrays;
-import java.util.List;
-
-import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -13,19 +10,32 @@ import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
+import io.github.d_sch.reactor.common.NodeComparator;
 import io.github.d_sch.reactor.common.NodePredicate;
-import io.github.d_sch.reactor.operators.FluxNestedLoopJoin;
+import io.github.d_sch.reactor.operators.FluxMergeJoin;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
-public class FluxNestedLoopJoinTest {
+public class FluxMergeJoinTest {
 
     private static ObjectMapper om = new ObjectMapper();
     private Flux<ObjectNode> left;
     private Flux<ObjectNode> right;
 
+	private NodeComparator comparator;
+
     @BeforeEach
     public void beforeEach() throws JsonMappingException, JsonProcessingException {
+
+        comparator = NodeComparator.comparing(
+                JsonPointer.valueOf("/a/customerId"),
+                JsonPointer.valueOf("/b/customerId")
+        );
+
+        final var sortComparator = NodeComparator.comparing(
+                JsonPointer.valueOf("/a/customerId"),
+                JsonPointer.valueOf("/a/customerId")
+        );
 
         left = Mono.just(
                 Arrays.asList(
@@ -45,7 +55,7 @@ public class FluxNestedLoopJoinTest {
                 ).cast(
                         ObjectNode.class
                 )
-        );
+        ).sort(sortComparator);
 
         System.out.println(
                 "LEFT: " + om.valueToTree(
@@ -83,16 +93,10 @@ public class FluxNestedLoopJoinTest {
     public void testInnerJoin() throws JsonMappingException, JsonProcessingException {
         var om = new ObjectMapper();
 
-        final var predicate = NodePredicate.equals(
-                JsonPointer.valueOf(
-                        "/a/customerId"
-                ), JsonPointer.valueOf(
-                        "/b/customerId"
-                )
-        );
+        final var predicate = NodePredicate.alwaysTrue();
 
-        var result = FluxNestedLoopJoin.innerJoin(
-                predicate, left, right.collectList()
+        var result = FluxMergeJoin.innerJoin(
+                comparator, predicate, left, right
         ).collectList().block();
         System.out.println(
                 "INNER_JOIN: " + om.valueToTree(
@@ -105,22 +109,80 @@ public class FluxNestedLoopJoinTest {
     public void testLeftOuterJoin() throws JsonMappingException, JsonProcessingException {
         var om = new ObjectMapper();
 
-        final var predicate = NodePredicate.equals(
-                JsonPointer.valueOf(
-                        "/a/customerId"
-                ), JsonPointer.valueOf(
-                        "/b/customerId"
-                )
-        );
+        final var predicate = NodePredicate.alwaysTrue();
 
-        var result = FluxNestedLoopJoin.leftOuterJoin(
-                predicate, left, right.collectList()
+        var result = FluxMergeJoin.leftOuterJoin(
+                comparator, predicate, left, right
         ).collectList().block();
         System.out.println(
-                "INNER_JOIN: " + om.valueToTree(
+                "LEFT_OUTER_JOIN: " + om.valueToTree(
                         result
                 ).toPrettyString()
         );
-
     }
+
+	@Test
+    public void testFullOuterJoin() throws JsonMappingException, JsonProcessingException {
+        var om = new ObjectMapper();
+
+        final var predicate = NodePredicate.alwaysTrue();
+
+        var result = FluxMergeJoin.fullOuterJoin(
+                comparator, predicate, left, right
+        ).collectList().block();
+        System.out.println(
+                "FULL_OUTER_JOIN: " + om.valueToTree(
+                        result
+                ).toPrettyString()
+        );
+    }
+
+	@Test
+    public void testRightOuterJoin() throws JsonMappingException, JsonProcessingException {
+        var om = new ObjectMapper();
+
+        final var predicate = NodePredicate.alwaysTrue();
+
+        var result = FluxMergeJoin.rightOuterJoin(
+                comparator, predicate, left, right
+        ).collectList().block();
+        System.out.println(
+                "RIGHT_OUTER_JOIN: " + om.valueToTree(
+                        result
+                ).toPrettyString()
+        );
+    }
+
+	@Test
+    public void testLeftSemiJoin() throws JsonMappingException, JsonProcessingException {
+        var om = new ObjectMapper();
+
+        final var predicate = NodePredicate.alwaysTrue();
+
+        var result = FluxMergeJoin.leftSemiJoin(
+                comparator, predicate, left, right
+        ).collectList().block();
+        System.out.println(
+                "LEFT_SEMI_JOIN: " + om.valueToTree(
+                        result
+                ).toPrettyString()
+        );
+    }
+
+	@Test
+    public void testRightSemiJoin() throws JsonMappingException, JsonProcessingException {
+        var om = new ObjectMapper();
+
+        final var predicate = NodePredicate.alwaysTrue();
+
+        var result = FluxMergeJoin.rightSemiJoin(
+                comparator, predicate, left, right
+        ).collectList().block();
+        System.out.println(
+                "RIGHT_SEMI_JOIN: " + om.valueToTree(
+                        result
+                ).toPrettyString()
+        );
+    }
+
 }

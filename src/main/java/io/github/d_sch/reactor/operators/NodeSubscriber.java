@@ -16,120 +16,167 @@ import reactor.core.publisher.BaseSubscriber;
 
 public class NodeSubscriber {
 
-    @Getter
-    final private AtomicBoolean isCompleted = new AtomicBoolean();
-    @Getter
-    final protected AtomicBoolean isMatched = new AtomicBoolean();
-    @Getter
-    final protected Queue<ObjectNode> actualValue = new ArrayDeque<>();
+	@Getter
+	final private AtomicBoolean isCompleted = new AtomicBoolean();
+	@Getter
+	final protected AtomicBoolean isMatched = new AtomicBoolean();
+	@Getter
+	final protected Queue<ObjectNode> actualValue = new ArrayDeque<>();
 
-    @Getter
-    private BaseSubscriber<ObjectNode> subscriber;
+	@Getter
+	private BaseSubscriber<ObjectNode> subscriber;
 
-    private Consumer<ObjectNode> nextConsumer = objectNode -> {};
-    private Consumer<Subscription> subscriptionConsumer = subscription -> {};
-    private Runnable completionRunnable = () -> {};
+	private Consumer<ObjectNode> nextConsumer = objectNode -> {};
 
-    private Consumer<Throwable> errorConsumer = e -> {};
+	private Consumer<Subscription> subscriptionConsumer = subscription -> {};
 
-    private NodeSubscriber() {
-    }
+	private Runnable completionRunnable = () -> {};
 
-    void reset() {
-        try {
-            this.getIsMatched().set(false);
-            this.getActualValue().poll();
-        } catch (Throwable e) {
-            Exceptions.throwIfFatal(e);
-            this.cancel();
-            this.subscriber.onError(e);
-        }
-    }
+	private Consumer<Throwable> errorConsumer = e -> {};
 
-    public void request() {
-        request(1L);
-    }
+	private NodeSubscriber() {
+	}
 
-    public void request(long number) {
-        try {
-            if (!this.getIsCompleted().get()
-                    && this.getActualValue().peek() == null) {
-                this.subscriber.request(1);
-            }
-        } catch (Throwable e) {
-            Exceptions.throwIfFatal(e);
-            this.cancel();
-            this.subscriber.onError(e);
-        }
-    }
+	void reset() {
+		try {
+			this.getIsMatched().set(
+					false
+			);
+			this.getActualValue().poll();
+		} catch (Throwable e) {
+			Exceptions.throwIfFatal(
+					e
+			);
+			this.cancel();
+			this.subscriber.onError(
+					e
+			);
+		}
+	}
 
-    public void cancel() {
-        try {
-            this.getIsMatched().set(false);
-            this.getActualValue().clear();
-        } catch (Throwable e) {
-            Exceptions.throwIfFatal(e);
-            this.subscriber.onError(e);
-        }
-        this.subscriber.cancel();
-    }
+	public void request() {
+		request(
+				1L
+		);
+	}
 
-    static NodeSubscriber buildSubscriber(Consumer<ObjectNode> nextConsumer, Runnable completionRunnable, Consumer<Throwable> errorConsumer) {
-        NodeSubscriber result = new NodeSubscriber();
-        result.nextConsumer = nextConsumer;
-        result.completionRunnable = completionRunnable;
-        result.errorConsumer = errorConsumer;
+	public void request(long number) {
+		try {
+			if (!this.getIsCompleted().get() && this.getActualValue().peek() == null) {
+				this.subscriber.request(
+						1
+				);
+			}
+		} catch (Throwable e) {
+			Exceptions.throwIfFatal(
+					e
+			);
+			this.cancel();
+			this.subscriber.onError(
+					e
+			);
+		}
+	}
 
-        result.subscriber = new BaseSubscriber<>() {
+	public void cancel() {
+		try {
+			this.getIsMatched().set(
+					false
+			);
+			this.getActualValue().clear();
+		} catch (Throwable e) {
+			Exceptions.throwIfFatal(
+					e
+			);
+			this.subscriber.onError(
+					e
+			);
+		}
+		this.subscriber.cancel();
+	}
 
-            @Override
-            protected void hookOnNext(@NotNull ObjectNode value) {
-                try {
-                    result.getActualValue().offer(value);
-                    if (result.nextConsumer != null) {
-                        result.nextConsumer.accept(value);
-                    }
-                } catch (Throwable e) {
-                    Exceptions.throwIfFatal(e);
-                    this.cancel();
-                    this.onError(e);
-                }
-            }
+	static NodeSubscriber buildSubscriber(Consumer<ObjectNode> nextConsumer, Runnable completionRunnable,
+			Consumer<Throwable> errorConsumer) {
+		NodeSubscriber result = new NodeSubscriber();
+		result.nextConsumer = nextConsumer;
+		result.completionRunnable = completionRunnable;
+		result.errorConsumer = errorConsumer;
 
-            @Override
-            protected void hookOnComplete() {
-                try {
-                    result.getIsCompleted().set(true);
-                    if (result.completionRunnable != null) {
-                        result.completionRunnable.run();
-                    }
-                } catch (Throwable e) {
-                    Exceptions.throwIfFatal(e);
-                    this.onError(e);
-                }
-            }
+		result.subscriber = new BaseSubscriber<>() {
 
-            @Override
-            protected void hookOnSubscribe(@NotNull Subscription subscription) {
-                try {
-                    subscription.request(1);
-                } catch (Throwable e) {
-                    Exceptions.throwIfFatal(e);
-                    this.onError(e);
-                }
-            }
+			@Override
+			protected void hookOnNext(@NotNull ObjectNode value) {
+				try {
+					result.getActualValue().offer(
+							value
+					);
+					if (result.nextConsumer != null) {
+						result.nextConsumer.accept(
+								value
+						);
+					}
+				} catch (Throwable e) {
+					Exceptions.throwIfFatal(
+							e
+					);
+					this.cancel();
+					this.onError(
+							e
+					);
+				}
+			}
 
-            @Override
-            protected void hookOnError(@NotNull Throwable throwable) {
-                try {
-                    result.errorConsumer.accept(throwable);
-                } catch (Throwable e) {
-                    Exceptions.throwIfFatal(e);
-                    this.onError(e);
-                }
-            }
-        };
-        return result;
-    }
+			@Override
+			protected void hookOnComplete() {
+				try {
+					result.getIsCompleted().set(
+							true
+					);
+					if (result.completionRunnable != null) {
+						result.completionRunnable.run();
+					}
+				} catch (Throwable e) {
+					Exceptions.throwIfFatal(
+							e
+					);
+					this.onError(
+							e
+					);
+				}
+			}
+
+			@Override
+			protected void hookOnSubscribe(@NotNull Subscription subscription) {
+				try {
+					subscription.request(
+							1
+					);
+				} catch (Throwable e) {
+					Exceptions.throwIfFatal(
+							e
+					);
+					this.onError(
+							e
+					);
+				}
+			}
+
+			@Override
+			protected void hookOnError(@NotNull Throwable throwable) {
+				try {
+					result.errorConsumer.accept(
+							throwable
+					);
+				} catch (Throwable e) {
+					Exceptions.throwIfFatal(
+							e
+					);
+					this.onError(
+							e
+					);
+				}
+			}
+		};
+		return result;
+	}
 }
-

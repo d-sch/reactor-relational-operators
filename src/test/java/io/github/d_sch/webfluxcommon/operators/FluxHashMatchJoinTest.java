@@ -1,9 +1,6 @@
 package io.github.d_sch.webfluxcommon.operators;
 
 import java.util.Arrays;
-import java.util.List;
-
-import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -13,19 +10,31 @@ import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
+import io.github.d_sch.reactor.common.NodeHash;
 import io.github.d_sch.reactor.common.NodePredicate;
-import io.github.d_sch.reactor.operators.FluxNestedLoopJoin;
+import io.github.d_sch.reactor.operators.FluxHashMatchJoin;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
-public class FluxNestedLoopJoinTest {
+public class FluxHashMatchJoinTest {
 
     private static ObjectMapper om = new ObjectMapper();
     private Flux<ObjectNode> left;
     private Flux<ObjectNode> right;
 
+    private NodeHash<Integer> hashLeft;
+    private NodeHash<Integer> hashRight;
+
     @BeforeEach
     public void beforeEach() throws JsonMappingException, JsonProcessingException {
+
+        hashLeft = NodeHash.hashCode(
+                JsonPointer.valueOf("/a/customerId")
+        );
+
+        hashRight = NodeHash.hashCode(
+                JsonPointer.valueOf("/b/customerId")
+        );
 
         left = Mono.just(
                 Arrays.asList(
@@ -91,8 +100,8 @@ public class FluxNestedLoopJoinTest {
                 )
         );
 
-        var result = FluxNestedLoopJoin.innerJoin(
-                predicate, left, right.collectList()
+        var result = FluxHashMatchJoin.innerJoin(
+                hashLeft, hashRight, predicate, left, right
         ).collectList().block();
         System.out.println(
                 "INNER_JOIN: " + om.valueToTree(
@@ -113,14 +122,58 @@ public class FluxNestedLoopJoinTest {
                 )
         );
 
-        var result = FluxNestedLoopJoin.leftOuterJoin(
-                predicate, left, right.collectList()
+        var result = FluxHashMatchJoin.leftOuterJoin(
+                hashLeft, hashRight, predicate, left, right
         ).collectList().block();
         System.out.println(
                 "INNER_JOIN: " + om.valueToTree(
                         result
                 ).toPrettyString()
         );
-
     }
+
+	@Test
+    public void testFullOuterJoin() throws JsonMappingException, JsonProcessingException {
+        var om = new ObjectMapper();
+
+        final var predicate = NodePredicate.equals(
+                JsonPointer.valueOf(
+                        "/a/customerId"
+                ), JsonPointer.valueOf(
+                        "/b/customerId"
+                )
+        );
+
+        var result = FluxHashMatchJoin.fullOuterJoin(
+                hashLeft, hashRight, predicate, left, right
+        ).collectList().block();
+        System.out.println(
+                "INNER_JOIN: " + om.valueToTree(
+                        result
+                ).toPrettyString()
+        );
+    }
+
+	@Test
+    public void testRightOuterJoin() throws JsonMappingException, JsonProcessingException {
+        var om = new ObjectMapper();
+
+        final var predicate = NodePredicate.equals(
+                JsonPointer.valueOf(
+                        "/a/customerId"
+                ), JsonPointer.valueOf(
+                        "/b/customerId"
+                )
+        );
+
+        var result = FluxHashMatchJoin.rightOuterJoin(
+                hashLeft, hashRight, predicate, left, right
+        ).collectList().block();
+        System.out.println(
+                "INNER_JOIN: " + om.valueToTree(
+                        result
+                ).toPrettyString()
+        );
+    }
+
 }

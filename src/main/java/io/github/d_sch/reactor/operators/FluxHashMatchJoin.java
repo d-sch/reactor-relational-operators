@@ -1,5 +1,6 @@
 package io.github.d_sch.reactor.operators;
 
+import java.util.List;
 import java.util.Map;
 import java.util.function.Predicate;
 
@@ -17,153 +18,200 @@ import reactor.util.function.Tuples;
 
 public class FluxHashMatchJoin {
 
-    static private ObjectMapper om = new ObjectMapper();
+	static private ObjectMapper om = new ObjectMapper();
 
-    public static <K> Flux<ObjectNode> innerJoin(NodeHash<K> hashLeft,
-    NodeHash<K> hashRight, NodePredicate predicate, Flux<ObjectNode> left, Flux<ObjectNode> right) {
-        return hashMatchJoin(HashMatchJoinType.INNER_JOIN, hashLeft, hashRight, predicate, left, right);
-    }
+	public static <K> Flux<ObjectNode> innerJoin(NodeHash<K> hashLeft, NodeHash<K> hashRight, NodePredicate predicate,
+			Mono<List<ObjectNode>> left, Flux<ObjectNode> right) {
+		return hashMatchJoin(
+				HashMatchJoinType.INNER_JOIN, hashLeft, hashRight, predicate, left, right
+		);
+	}
 
-    public static <K> Flux<ObjectNode> leftOuterJoin(NodeHash<K> hashLeft,
-    NodeHash<K> hashRight, NodePredicate predicate, Flux<ObjectNode> left, Flux<ObjectNode> right) {
-        return hashMatchJoin(HashMatchJoinType.LEFT_OUTER_JOIN, hashLeft, hashRight, predicate, left, right);
-    }
+	public static <K> Flux<ObjectNode> innerJoin(NodeHash<K> hashLeft, NodeHash<K> hashRight, NodePredicate predicate,
+			Flux<ObjectNode> left, Flux<ObjectNode> right) {
+		return hashMatchJoin(
+				HashMatchJoinType.INNER_JOIN, hashLeft, hashRight, predicate, left, right
+		);
+	}
 
-    public static <K> Flux<ObjectNode> rightOuterJoin(NodeHash<K> hashLeft,
-    NodeHash<K> hashRight, NodePredicate predicate, Flux<ObjectNode> left, Flux<ObjectNode> right) {
-        return hashMatchJoin(HashMatchJoinType.RIGHT_OUTER_JOIN, hashLeft, hashRight, predicate, left, right);
-    }
+	public static <K> Flux<ObjectNode> leftOuterJoin(NodeHash<K> hashLeft, NodeHash<K> hashRight,
+			NodePredicate predicate, Mono<List<ObjectNode>> left, Flux<ObjectNode> right) {
+		return hashMatchJoin(
+				HashMatchJoinType.LEFT_OUTER_JOIN, hashLeft, hashRight, predicate, left, right
+		);
+	}
 
-    public static <K> Flux<ObjectNode> fullOuterJoin(NodeHash<K> hashLeft,
-    NodeHash<K> hashRight, NodePredicate predicate, Flux<ObjectNode> left, Flux<ObjectNode> right) {
-        return hashMatchJoin(HashMatchJoinType.FULL_OUTER_JOIN, hashLeft, hashRight, predicate, left, right);
-    }
+	public static <K> Flux<ObjectNode> leftOuterJoin(NodeHash<K> hashLeft, NodeHash<K> hashRight,
+			NodePredicate predicate, Flux<ObjectNode> left, Flux<ObjectNode> right) {
+		return hashMatchJoin(
+				HashMatchJoinType.LEFT_OUTER_JOIN, hashLeft, hashRight, predicate, left, right
+		);
+	}
 
-    public static <K> Flux<ObjectNode> hashMatchJoin(HashMatchJoinType joinType, NodeHash<K> hashLeft,
-            NodeHash<K> hashRight, NodePredicate predicate, Flux<ObjectNode> left, Flux<ObjectNode> right) {
-        
+	public static <K> Flux<ObjectNode> rightOuterJoin(NodeHash<K> hashLeft, NodeHash<K> hashRight,
+			NodePredicate predicate, Mono<List<ObjectNode>> left, Flux<ObjectNode> right) {
+		return hashMatchJoin(
+				HashMatchJoinType.RIGHT_OUTER_JOIN, hashLeft, hashRight, predicate, left, right
+		);
+	}
 
-        var leftMap = buildLeftMap(
-                hashLeft, left
-        );
+	public static <K> Flux<ObjectNode> rightOuterJoin(NodeHash<K> hashLeft, NodeHash<K> hashRight,
+			NodePredicate predicate, Flux<ObjectNode> left, Flux<ObjectNode> right) {
+		return hashMatchJoin(
+				HashMatchJoinType.RIGHT_OUTER_JOIN, hashLeft, hashRight, predicate, left, right
+		);
+	}
 
-        return right.transform(
-            innerFlux -> probing(joinType, innerFlux, hashRight, leftMap, predicate)
-        ).filter(
-                Predicate.not(
-                        ObjectNode::isEmpty
-                )
-        ).transform(
-                flux -> handleLeftUnmatched(
-                        joinType, om, leftMap, flux
-                )
-        );
-    }
+	public static <K> Flux<ObjectNode> fullOuterJoin(NodeHash<K> hashLeft, NodeHash<K> hashRight,
+			NodePredicate predicate, Mono<List<ObjectNode>> left, Flux<ObjectNode> right) {
+		return hashMatchJoin(
+				HashMatchJoinType.FULL_OUTER_JOIN, hashLeft, hashRight, predicate, left, right
+		);
+	}
 
-    private static <K> Flux<ObjectNode> probing(HashMatchJoinType joinType, Flux<ObjectNode> innerFlux, NodeHash<K> hashRight, Mono<Map<K, Tuple2<ObjectNode, Boolean>>> leftMap, NodePredicate predicate) {
-        if (joinType == HashMatchJoinType.RIGHT_OUTER_JOIN
-                            || joinType == HashMatchJoinType.FULL_OUTER_JOIN) {                        
-                return innerFlux.withLatestFrom(
-                        leftMap, (rightObject, map) -> {
-                            var merged = om.createObjectNode();
-                            var result = probeRight(
-                                    hashRight, predicate, rightObject, map
-                            );
-                            if (result != null && result.getT2()) {
-                                merged.setAll(
-                                        result.getT1()
-                                );
-                                merged.setAll(
-                                        rightObject
-                                );
-                            } else {
-                                merged.setAll(
-                                        rightObject
-                                );
-                            }
-                            return merged;
-                        }
-                );
-            } else {
-                return innerFlux.withLatestFrom(
-                        leftMap, (rightObject, map) -> {
-                            var merged = om.createObjectNode();
-                            var result = probeRight(
-                                    hashRight, predicate, rightObject, map
-                            );
-                            if (result != null && result.getT2()) {
-                                merged.setAll(
-                                        result.getT1()
-                                );
-                                merged.setAll(
-                                        rightObject
-                                );
-                            }
-                            return merged;
-                        }
-                );
-            }
-    }
+	public static <K> Flux<ObjectNode> fullOuterJoin(NodeHash<K> hashLeft, NodeHash<K> hashRight,
+			NodePredicate predicate, Flux<ObjectNode> left, Flux<ObjectNode> right) {
+		return hashMatchJoin(
+				HashMatchJoinType.FULL_OUTER_JOIN, hashLeft, hashRight, predicate, left, right
+		);
+	}
 
-    private static <K> Flux<ObjectNode> handleLeftUnmatched(HashMatchJoinType joinType, ObjectMapper om,
-            Mono<Map<K, Tuple2<ObjectNode, Boolean>>> leftMap, Flux<ObjectNode> flux) {
-        if (joinType == HashMatchJoinType.LEFT_OUTER_JOIN
-                || joinType == HashMatchJoinType.FULL_OUTER_JOIN) {
-            return flux.concatWith(
-                    leftMap.flatMapMany(
-                            map -> Flux.fromIterable(
-                                    map.values()
-                            )
-                    ).filter(
-                            Predicate.not(
-                                    Tuple2::getT2
-                            )
-                    ).map(
-                            tuple -> {
-                                var merged = om.createObjectNode();
-                                merged.setAll(
-                                        tuple.getT1()
-                                );
-                                return merged;
-                            }
-                    )
-            );
-        } else {
-            return flux;
-        }
-    }
+	public static <K> Flux<ObjectNode> hashMatchJoin(HashMatchJoinType joinType, NodeHash<K> hashLeft,
+			NodeHash<K> hashRight, NodePredicate predicate, Mono<List<ObjectNode>> left, Flux<ObjectNode> right) {
+		return hashMatchJoin(
+				joinType, hashLeft, hashRight, predicate, left.flatMapMany(
+						list -> Flux.fromIterable(
+								list
+						)
+				), right
+		);
+	}
 
-    private static <K> Tuple2<ObjectNode, Boolean> probeRight(NodeHash<K> hashRight, NodePredicate predicate,
-            ObjectNode rightObject, Map<K, Tuple2<ObjectNode, Boolean>> map) {
-        return map.computeIfPresent(
-                hashRight.apply(
-                        rightObject
-                ), (k, tuple) -> {
-                    if (predicate.test(
-                            tuple.getT1(), rightObject
-                    )) {
-                        return tuple.mapT2(
-                                old -> true
-                        );
-                    }
-                    return tuple;
-                }
-        );
-    }
+	public static <K> Flux<ObjectNode> hashMatchJoin(HashMatchJoinType joinType, NodeHash<K> hashLeft,
+			NodeHash<K> hashRight, NodePredicate predicate, Flux<ObjectNode> left, Flux<ObjectNode> right) {
 
-    private static <K> Mono<Map<K, Tuple2<ObjectNode, Boolean>>> buildLeftMap(NodeHash<K> hashLeft,
-            Flux<ObjectNode> left) {
-        return left.map(
-                jsonNodes -> Tuples.of(
-                        hashLeft.apply(
-                                jsonNodes
-                        ), Tuples.of(
-                                jsonNodes, false
-                        )
-                )
-        ).collectMap(
-                Tuple2::getT1, Tuple2::getT2
-        );
-    }
+		var leftMap = buildLeftMap(
+				hashLeft, left
+		);
+
+		return right.transform(
+				innerFlux -> probing(
+						joinType, innerFlux, hashRight, leftMap, predicate
+				)
+		).filter(
+				Predicate.not(
+						ObjectNode::isEmpty
+				)
+		).transform(
+				flux -> handleLeftUnmatched(
+						joinType, om, leftMap, flux
+				)
+		);
+	}
+
+	private static <K> Flux<ObjectNode> probing(HashMatchJoinType joinType, Flux<ObjectNode> innerFlux,
+			NodeHash<K> hashRight, Mono<Map<K, Tuple2<ObjectNode, Boolean>>> leftMap, NodePredicate predicate) {
+		if (joinType == HashMatchJoinType.RIGHT_OUTER_JOIN || joinType == HashMatchJoinType.FULL_OUTER_JOIN) {
+			return innerFlux.withLatestFrom(
+					leftMap, (rightObject, map) -> {
+						var merged = om.createObjectNode();
+						var result = probeRight(
+								hashRight, predicate, rightObject, map
+						);
+						if (result != null && result.getT2()) {
+							merged.setAll(
+									result.getT1()
+							);
+							merged.setAll(
+									rightObject
+							);
+						} else {
+							merged.setAll(
+									rightObject
+							);
+						}
+						return merged;
+					}
+			);
+		} else {
+			return innerFlux.withLatestFrom(
+					leftMap, (rightObject, map) -> {
+						var merged = om.createObjectNode();
+						var result = probeRight(
+								hashRight, predicate, rightObject, map
+						);
+						if (result != null && result.getT2()) {
+							merged.setAll(
+									result.getT1()
+							);
+							merged.setAll(
+									rightObject
+							);
+						}
+						return merged;
+					}
+			);
+		}
+	}
+
+	private static <K> Flux<ObjectNode> handleLeftUnmatched(HashMatchJoinType joinType, ObjectMapper om,
+			Mono<Map<K, Tuple2<ObjectNode, Boolean>>> leftMap, Flux<ObjectNode> flux) {
+		if (joinType == HashMatchJoinType.LEFT_OUTER_JOIN || joinType == HashMatchJoinType.FULL_OUTER_JOIN) {
+			return flux.concatWith(
+					leftMap.flatMapMany(
+							map -> Flux.fromIterable(
+									map.values()
+							)
+					).filter(
+							Predicate.not(
+									Tuple2::getT2
+							)
+					).map(
+							tuple -> {
+								var merged = om.createObjectNode();
+								merged.setAll(
+										tuple.getT1()
+								);
+								return merged;
+							}
+					)
+			);
+		} else {
+			return flux;
+		}
+	}
+
+	private static <K> Tuple2<ObjectNode, Boolean> probeRight(NodeHash<K> hashRight, NodePredicate predicate,
+			ObjectNode rightObject, Map<K, Tuple2<ObjectNode, Boolean>> map) {
+		return map.computeIfPresent(
+				hashRight.apply(
+						rightObject
+				), (k, tuple) -> {
+					if (predicate.test(
+							tuple.getT1(), rightObject
+					)) {
+						return tuple.mapT2(
+								old -> true
+						);
+					}
+					return tuple;
+				}
+		);
+	}
+
+	private static <K> Mono<Map<K, Tuple2<ObjectNode, Boolean>>> buildLeftMap(NodeHash<K> hashLeft,
+			Flux<ObjectNode> left) {
+		return left.map(
+				jsonNodes -> Tuples.of(
+						hashLeft.apply(
+								jsonNodes
+						), Tuples.of(
+								jsonNodes, false
+						)
+				)
+		).collectMap(
+				Tuple2::getT1, Tuple2::getT2
+		);
+	}
 
 }
