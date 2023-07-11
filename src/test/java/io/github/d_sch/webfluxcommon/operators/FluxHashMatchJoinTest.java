@@ -29,9 +29,11 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import io.github.d_sch.reactor.common.NodeHash;
 import io.github.d_sch.reactor.common.NodePredicate;
 import io.github.d_sch.reactor.operators.FluxHashMatchJoin;
+import lombok.extern.slf4j.Slf4j;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
+@Slf4j
 public class FluxHashMatchJoinTest {
 
     private static ObjectMapper om = new ObjectMapper();
@@ -72,11 +74,9 @@ public class FluxHashMatchJoinTest {
                 )
         );
 
-        System.out.println(
-                "LEFT: " + om.valueToTree(
+		log.info("LEFT: " + om.valueToTree(
                         left.collectList().block()
-                ).toPrettyString()
-        );
+                ).toPrettyString());
 
         right = Mono.just(
                 Arrays.asList(
@@ -96,7 +96,7 @@ public class FluxHashMatchJoinTest {
                 )
         );
 
-        System.out.println(
+        log.info(
                 "RIGHT: " + om.valueToTree(
                         right.collectList().block()
                 ).toPrettyString()
@@ -119,7 +119,8 @@ public class FluxHashMatchJoinTest {
         var result = FluxHashMatchJoin.innerJoin(
                 hashLeft, hashRight, predicate, left, right
         ).collectList().block();
-        System.out.println(
+
+        log.info(
                 "INNER_JOIN: " + om.valueToTree(
                         result
                 ).toPrettyString()
@@ -141,8 +142,8 @@ public class FluxHashMatchJoinTest {
         var result = FluxHashMatchJoin.leftOuterJoin(
                 hashLeft, hashRight, predicate, left, right
         ).collectList().block();
-        System.out.println(
-                "INNER_JOIN: " + om.valueToTree(
+        log.info(
+                "LEFT_OUTER_JOIN: " + om.valueToTree(
                         result
                 ).toPrettyString()
         );
@@ -163,8 +164,8 @@ public class FluxHashMatchJoinTest {
         var result = FluxHashMatchJoin.fullOuterJoin(
                 hashLeft, hashRight, predicate, left, right
         ).collectList().block();
-        System.out.println(
-                "INNER_JOIN: " + om.valueToTree(
+        log.info(
+                "FULL_OUTER_JOIN: " + om.valueToTree(
                         result
                 ).toPrettyString()
         );
@@ -185,8 +186,8 @@ public class FluxHashMatchJoinTest {
         var result = FluxHashMatchJoin.rightOuterJoin(
                 hashLeft, hashRight, predicate, left, right
         ).collectList().block();
-        System.out.println(
-                "INNER_JOIN: " + om.valueToTree(
+        log.info(
+                "RIGHT_OUT_JOIN: " + om.valueToTree(
                         result
                 ).toPrettyString()
         );

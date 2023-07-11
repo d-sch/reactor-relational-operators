@@ -27,11 +27,13 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 
 import io.github.d_sch.reactor.common.NodeHash;
 import io.github.d_sch.reactor.common.NodePredicate;
+import lombok.extern.slf4j.Slf4j;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.util.function.Tuple2;
 import reactor.util.function.Tuples;
 
+@Slf4j
 public class FluxHashMatchJoin {
 
 	static private ObjectMapper om = new ObjectMapper();
@@ -134,14 +136,17 @@ public class FluxHashMatchJoin {
 						var result = probeRight(
 								hashRight, predicate, rightObject, map
 						);
+						log.debug("Probe result {}", result);
 						if (result != null && result.getT2()) {
+							log.debug("Probe matched return left and right (joinType:{}), left:{} right:{})", joinType, result.getT1(), rightObject);
 							merged.setAll(
 									result.getT1()
 							);
 							merged.setAll(
 									rightObject
-							);
+							);							
 						} else {
+							log.debug("Probe not matched return right (joinType:{}), right:{})", joinType, rightObject);
 							merged.setAll(
 									rightObject
 							);
@@ -157,6 +162,7 @@ public class FluxHashMatchJoin {
 								hashRight, predicate, rightObject, map
 						);
 						if (result != null && result.getT2()) {
+							log.debug("Probe matched return left and right (joinType:{}, left:{} right:{})", joinType, result.getT1(), rightObject);
 							merged.setAll(
 									result.getT1()
 							);
@@ -184,6 +190,7 @@ public class FluxHashMatchJoin {
 							)
 					).map(
 							tuple -> {
+								log.debug("Probe unmatched return left (joinType:{}, left:{})", joinType, tuple.getT1());
 								var merged = om.createObjectNode();
 								merged.setAll(
 										tuple.getT1()
@@ -205,11 +212,13 @@ public class FluxHashMatchJoin {
 				), (k, tuple) -> {
 					if (predicate.test(
 							tuple.getT1(), rightObject
-					)) {
+					)) {				
+						log.debug("Probe matched {}", tuple.getT1());		
 						return tuple.mapT2(
 								old -> true
 						);
 					}
+					log.debug("Probe not matche {}", tuple);
 					return tuple;
 				}
 		);
