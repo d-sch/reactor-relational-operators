@@ -44,8 +44,6 @@ public class NodeSubscriber {
 
 	private Consumer<ObjectNode> nextConsumer = objectNode -> {};
 
-	private Consumer<Subscription> subscriptionConsumer = subscription -> {};
-
 	private Runnable completionRunnable = () -> {};
 
 	private Consumer<Throwable> errorConsumer = e -> {};
