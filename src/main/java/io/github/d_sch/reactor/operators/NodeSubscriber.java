@@ -35,8 +35,6 @@ public class NodeSubscriber {
 	@Getter
 	final private AtomicBoolean isCompleted = new AtomicBoolean();
 	@Getter
-	final protected AtomicBoolean isMatched = new AtomicBoolean();
-	@Getter
 	final protected Queue<ObjectNode> actualValue = new ArrayDeque<>();
 
 	@Getter
@@ -53,9 +51,6 @@ public class NodeSubscriber {
 
 	void reset() {
 		try {
-			this.getIsMatched().set(
-					false
-			);
 			this.getActualValue().poll();
 		} catch (Throwable e) {
 			Exceptions.throwIfFatal(
@@ -94,9 +89,6 @@ public class NodeSubscriber {
 
 	public void cancel() {
 		try {
-			this.getIsMatched().set(
-					false
-			);
 			this.getActualValue().clear();
 		} catch (Throwable e) {
 			Exceptions.throwIfFatal(

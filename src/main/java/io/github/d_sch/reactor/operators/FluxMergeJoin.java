@@ -17,10 +17,13 @@
 
 package io.github.d_sch.reactor.operators;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.json.JsonMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
 import io.github.d_sch.reactor.common.NodeComparator;
@@ -39,10 +42,13 @@ public class FluxMergeJoin {
 	NodeComparator comparator;
 
 	NodePredicate predicate = (left, right) -> true;
-	ObjectMapper om = new ObjectMapper();
+	ObjectMapper om = JsonMapper.builder().build();
 
 	NodeSubscriber leftSubscriber;
 	NodeSubscriber rightSubscriber;
+
+	List<ObjectNode> leftBuffer = new ArrayList<>(16);
+	List<ObjectNode> rightBuffer = new ArrayList<>(16);
 
 	FluxSink<ObjectNode> fluxSink;
 
@@ -292,7 +298,61 @@ public class FluxMergeJoin {
 		}
 	}
 
+	/// Buffer current matched nodes
+	/// 
+	/// @param left
+	/// @param right
+	private void bufferCurrentMatch(ObjectNode left, ObjectNode right) {
+		Objects.requireNonNull(left, "Left node must not be null!");
+		Objects.requireNonNull(right, "Right node must not be null!");
+		
+		leftBuffer.add(
+			left
+		);
+		rightBuffer.add(
+			right
+		);		
+	}
+
+	/// Matched nodes buffer output
+	private void flushMatchedBuffer() {
+		if (leftBuffer.isEmpty() || rightBuffer.isEmpty()) {
+			//Clear non empty buffers
+			if (!leftBuffer.isEmpty()) {
+				leftBuffer.clear();
+			}
+			if (!rightBuffer.isEmpty()) {
+				rightBuffer.clear();	
+			}
+		}
+		leftBuffer.forEach(
+			left-> {
+				rightBuffer.forEach(
+					right -> {
+						if (mergeJoinType == MergeJoinType.INNER_JOIN || mergeJoinType == MergeJoinType.FULL_OUTER_JOIN
+								|| mergeJoinType == MergeJoinType.LEFT_OUTER_JOIN
+								|| mergeJoinType == MergeJoinType.RIGHT_OUTER_JOIN) {
+							nextBothMatchedJoin(
+									left, right
+							);						
+						} else {
+							if (mergeJoinType == MergeJoinType.LEFT_SEMI_JOIN) {
+								next(left);
+							} else if (mergeJoinType == MergeJoinType.RIGHT_SEMI_JOIN) {
+								next(right);
+							}
+						}
+
+					}
+				);
+			}
+		);
+		leftBuffer.clear();
+		rightBuffer.clear();
+	}
+
 	private void handleNext(ObjectNode left, ObjectNode right) {
+		//Default compare
 		int compare = left == null ? 1 : right == null ? -1 : 0;
 		boolean matched = false;
 
@@ -303,34 +363,13 @@ public class FluxMergeJoin {
 			matched = compare == 0 && predicateTest(
 					left, right
 			);
-			leftSubscriber.getIsMatched().set(
-					matched
-			);
-			rightSubscriber.getIsMatched().set(
-					matched
-			);
 		}
 		if (matched) {
-			if (mergeJoinType == MergeJoinType.INNER_JOIN || mergeJoinType == MergeJoinType.FULL_OUTER_JOIN
-					|| mergeJoinType == MergeJoinType.LEFT_OUTER_JOIN
-					|| mergeJoinType == MergeJoinType.RIGHT_OUTER_JOIN) {
-				bothMatchedJoin(
-						left, right
-				);
-			} else {
-				if (mergeJoinType == MergeJoinType.LEFT_SEMI_JOIN) {
-					next(
-							left
-					);
-				} else if (mergeJoinType == MergeJoinType.RIGHT_SEMI_JOIN) {
-					next(
-							right
-					);
-				}
-			}
+			bufferCurrentMatch(left, right);
 			leftSubscriber.reset();
 			rightSubscriber.reset();
 		} else {
+			flushMatchedBuffer();
 			if (compare < 0 || compare == 0) {
 				if (predicateTest(
 						left, null
@@ -382,7 +421,7 @@ public class FluxMergeJoin {
 		);
 	}
 
-	private void bothMatchedJoin(ObjectNode left, ObjectNode right) {
+	private void nextBothMatchedJoin(ObjectNode left, ObjectNode right) {
 		next(
 				createMergeObjectNode(
 						left, right

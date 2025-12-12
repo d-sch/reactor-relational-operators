@@ -16,6 +16,7 @@
  */
 package io.github.d_sch.webfluxcommon.operators;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -24,6 +25,7 @@ import com.fasterxml.jackson.core.JsonPointer;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.json.JsonMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
 import io.github.d_sch.reactor.common.NodeHash;
@@ -32,11 +34,12 @@ import io.github.d_sch.reactor.operators.FluxHashMatchJoin;
 import lombok.extern.slf4j.Slf4j;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import reactor.test.StepVerifier;
 
 @Slf4j
 public class FluxHashMatchJoinTest {
 
-    private static ObjectMapper om = new ObjectMapper();
+    private static ObjectMapper om = JsonMapper.builder().build();
     private Flux<ObjectNode> left;
     private Flux<ObjectNode> right;
 
@@ -105,8 +108,7 @@ public class FluxHashMatchJoinTest {
     }
 
     @Test
-    public void testInnerJoin() throws JsonMappingException, JsonProcessingException {
-        var om = new ObjectMapper();
+    public void testInnerJoin() throws JsonMappingException, JsonProcessingException {       
 
         final var predicate = NodePredicate.equals(
                 JsonPointer.valueOf(
@@ -129,7 +131,6 @@ public class FluxHashMatchJoinTest {
 
     @Test
     public void testLeftOuterJoin() throws JsonMappingException, JsonProcessingException {
-        var om = new ObjectMapper();
 
         final var predicate = NodePredicate.equals(
                 JsonPointer.valueOf(
@@ -139,19 +140,25 @@ public class FluxHashMatchJoinTest {
                 )
         );
 
-        var result = FluxHashMatchJoin.leftOuterJoin(
-                hashLeft, hashRight, predicate, left, right
-        ).collectList().block();
-        log.info(
-                "LEFT_OUTER_JOIN: " + om.valueToTree(
-                        result
-                ).toPrettyString()
-        );
+        StepVerifier.create(
+                FluxHashMatchJoin.leftOuterJoin(hashLeft, hashRight, predicate, left, right)
+        ).recordWith(
+                ArrayList::new
+        ).expectNext(                
+                om.readValue("{\"a\":{\"customerId\":\"1\",\"numberOfInquiries\":1},\"b\":{\"customerId\":\"1\",\"numberOfInquiries\":3}}", ObjectNode.class),
+                om.readValue("{\"a\":{\"customerId\":\"5\",\"numberOfInquiries\":2},\"b\":{\"customerId\":\"5\",\"numberOfInquiries\":7}}", ObjectNode.class),
+                om.readValue("{\"a\":{\"customerId\":\"2\",\"numberOfInquiries\":4}}", ObjectNode.class),
+                om.readValue("{\"a\":{\"customerId\":\"6\",\"numberOfInquiries\":5}}", ObjectNode.class)              
+        ).consumeRecordedWith(
+                //Log results
+                result -> {
+                        result.forEach(item -> log.info("LEFT_OUTER_JOIN ITEM: " + om.valueToTree(item).toPrettyString()));
+                }
+        ).verifyComplete();
     }
 
-	@Test
+    @Test
     public void testFullOuterJoin() throws JsonMappingException, JsonProcessingException {
-        var om = new ObjectMapper();
 
         final var predicate = NodePredicate.equals(
                 JsonPointer.valueOf(
@@ -161,19 +168,28 @@ public class FluxHashMatchJoinTest {
                 )
         );
 
-        var result = FluxHashMatchJoin.fullOuterJoin(
+        StepVerifier.create(FluxHashMatchJoin.fullOuterJoin(
                 hashLeft, hashRight, predicate, left, right
-        ).collectList().block();
-        log.info(
-                "FULL_OUTER_JOIN: " + om.valueToTree(
-                        result
-                ).toPrettyString()
-        );
+        )).recordWith(
+                ArrayList::new
+        ).expectNext(                
+                om.readValue("{\"a\":{\"customerId\":\"1\",\"numberOfInquiries\":1},\"b\":{\"customerId\":\"1\",\"numberOfInquiries\":3}}", ObjectNode.class),
+                om.readValue("{\"b\":{\"customerId\":\"3\",\"numberOfInquiries\":6}}", ObjectNode.class),
+                om.readValue("{\"a\":{\"customerId\":\"5\",\"numberOfInquiries\":2},\"b\":{\"customerId\":\"5\",\"numberOfInquiries\":7}}", ObjectNode.class),
+                om.readValue("{\"a\":{\"customerId\":\"2\",\"numberOfInquiries\":4}}", ObjectNode.class),
+                om.readValue("{\"a\":{\"customerId\":\"6\",\"numberOfInquiries\":5}}", ObjectNode.class)
+        ).consumeRecordedWith(
+                //Log results
+                result -> {
+                        result.forEach(item -> log.info("FULL_OUTER_JOIN ITEM: " + om.valueToTree(item).toPrettyString()));
+                }
+        ).verifyComplete();
+
     }
 
 	@Test
     public void testRightOuterJoin() throws JsonMappingException, JsonProcessingException {
-        var om = new ObjectMapper();
+        var om = JsonMapper.builder().build();
 
         final var predicate = NodePredicate.equals(
                 JsonPointer.valueOf(
@@ -183,14 +199,23 @@ public class FluxHashMatchJoinTest {
                 )
         );
 
-        var result = FluxHashMatchJoin.rightOuterJoin(
-                hashLeft, hashRight, predicate, left, right
-        ).collectList().block();
-        log.info(
-                "RIGHT_OUT_JOIN: " + om.valueToTree(
-                        result
-                ).toPrettyString()
-        );
+        StepVerifier.create(
+                FluxHashMatchJoin.rightOuterJoin(
+                        hashLeft, hashRight, predicate, left, right
+                )
+        ).recordWith(
+                ArrayList::new
+        ).expectNext(                
+                om.readValue("{\"a\":{\"customerId\":\"1\",\"numberOfInquiries\":1},\"b\":{\"customerId\":\"1\",\"numberOfInquiries\":3}}", ObjectNode.class),
+                om.readValue("{\"b\":{\"customerId\":\"3\",\"numberOfInquiries\":6}}", ObjectNode.class),
+                om.readValue("{\"a\":{\"customerId\":\"5\",\"numberOfInquiries\":2},\"b\":{\"customerId\":\"5\",\"numberOfInquiries\":7}}", ObjectNode.class)
+        ).consumeRecordedWith(
+                //Log results
+                result -> {
+                        result.forEach(item -> log.info("RIGHT_OUTER_JOIN ITEM: " + om.valueToTree(item).toPrettyString()));
+                }
+        ).verifyComplete();
+
     }
 
 }

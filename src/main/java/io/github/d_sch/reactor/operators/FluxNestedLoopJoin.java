@@ -19,6 +19,7 @@ package io.github.d_sch.reactor.operators;
 import java.util.List;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.json.JsonMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
 import io.github.d_sch.reactor.common.NodePredicate;
@@ -27,6 +28,8 @@ import reactor.core.publisher.Mono;
 import reactor.util.function.Tuples;
 
 public class FluxNestedLoopJoin {
+
+	private static ObjectMapper om = JsonMapper.builder().build();
 
 	public static Flux<ObjectNode> fromIterableChecked(List<ObjectNode> monoList) {
 		return Flux.defer(
@@ -74,7 +77,6 @@ public class FluxNestedLoopJoin {
 
 	public static Flux<ObjectNode> nestedLoopJoin(NestedLoopJoinType joinType, NodePredicate predicate,
 			Flux<ObjectNode> left, Mono<List<ObjectNode>> right) {
-		var om = new ObjectMapper();
 
 		Flux<ObjectNode> rightChecked = right.flatMapMany(
 				list -> fromIterableChecked(

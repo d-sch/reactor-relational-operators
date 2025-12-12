@@ -16,6 +16,7 @@
  */
 package io.github.d_sch.webfluxcommon.operators;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -24,16 +25,18 @@ import com.fasterxml.jackson.core.JsonPointer;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.json.JsonMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
 import io.github.d_sch.reactor.common.NodePredicate;
 import io.github.d_sch.reactor.operators.FluxNestedLoopJoin;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import reactor.test.StepVerifier;
 
 public class FluxNestedLoopJoinTest {
 
-    private static ObjectMapper om = new ObjectMapper();
+    private static ObjectMapper om = JsonMapper.builder().build();
     private Flux<ObjectNode> left;
     private Flux<ObjectNode> right;
 
@@ -93,8 +96,7 @@ public class FluxNestedLoopJoinTest {
     }
 
     @Test
-    public void testInnerJoin() throws JsonMappingException, JsonProcessingException {
-        var om = new ObjectMapper();
+    public void testInnerJoin() throws JsonMappingException, JsonProcessingException {        
 
         final var predicate = NodePredicate.equals(
                 JsonPointer.valueOf(
@@ -104,19 +106,25 @@ public class FluxNestedLoopJoinTest {
                 )
         );
 
-        var result = FluxNestedLoopJoin.innerJoin(
-                predicate, left, right.collectList()
-        ).collectList().block();
-        System.out.println(
-                "INNER_JOIN: " + om.valueToTree(
-                        result
-                ).toPrettyString()
-        );
+        StepVerifier.create(
+                FluxNestedLoopJoin.innerJoin(
+                        predicate, left, right.collectList()
+                )
+        ).recordWith(
+                ArrayList::new
+        ).expectNext(
+                om.readValue("{\"a\":{\"customerId\":\"1\",\"numberOfInquiries\":1},\"b\":{\"customerId\":\"1\",\"numberOfInquiries\":3}}", ObjectNode.class),
+                om.readValue("{\"a\":{\"customerId\":\"5\",\"numberOfInquiries\":2},\"b\":{\"customerId\":\"5\",\"numberOfInquiries\":7}}", ObjectNode.class)
+        ).consumeRecordedWith(
+                //Log results
+                result -> {
+                    result.forEach(item -> System.out.println("INNER_JOIN ITEM: " + om.valueToTree(item).toPrettyString()));
+                }
+        ).verifyComplete();
     }
 
     @Test
-    public void testLeftOuterJoin() throws JsonMappingException, JsonProcessingException {
-        var om = new ObjectMapper();
+    public void testLeftOuterJoin() throws JsonMappingException, JsonProcessingException {        
 
         final var predicate = NodePredicate.equals(
                 JsonPointer.valueOf(
@@ -126,14 +134,22 @@ public class FluxNestedLoopJoinTest {
                 )
         );
 
-        var result = FluxNestedLoopJoin.leftOuterJoin(
-                predicate, left, right.collectList()
-        ).collectList().block();
-        System.out.println(
-                "INNER_JOIN: " + om.valueToTree(
-                        result
-                ).toPrettyString()
-        );
-
+        StepVerifier.create(
+                FluxNestedLoopJoin.leftOuterJoin(
+                        predicate, left, right.collectList()
+                )
+        ).recordWith(
+                ArrayList::new
+        ).expectNext(
+                om.readValue("{\"a\":{\"customerId\":\"1\",\"numberOfInquiries\":1},\"b\":{\"customerId\":\"1\",\"numberOfInquiries\":3}}", ObjectNode.class),
+                om.readValue("{\"a\":{\"customerId\":\"5\",\"numberOfInquiries\":2},\"b\":{\"customerId\":\"5\",\"numberOfInquiries\":7}}", ObjectNode.class),
+                om.readValue("{\"a\":{\"customerId\":\"2\",\"numberOfInquiries\":4}}", ObjectNode.class),
+                om.readValue("{\"a\":{\"customerId\":\"6\",\"numberOfInquiries\":5}}", ObjectNode.class)
+        ).consumeRecordedWith(
+                //Log results
+                result -> {
+                    result.forEach(item -> System.out.println("LEFT_OUTER_JOIN ITEM: " + om.valueToTree(item).toPrettyString()));
+                }
+        ).verifyComplete();
     }
 }

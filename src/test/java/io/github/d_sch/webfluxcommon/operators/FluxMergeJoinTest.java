@@ -16,6 +16,7 @@
  */
 package io.github.d_sch.webfluxcommon.operators;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -24,6 +25,7 @@ import com.fasterxml.jackson.core.JsonPointer;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.json.JsonMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
 import io.github.d_sch.reactor.common.NodeComparator;
@@ -31,10 +33,11 @@ import io.github.d_sch.reactor.common.NodePredicate;
 import io.github.d_sch.reactor.operators.FluxMergeJoin;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import reactor.test.StepVerifier;
 
 public class FluxMergeJoinTest {
 
-    private static ObjectMapper om = new ObjectMapper();
+    private static ObjectMapper om = JsonMapper.builder().build();
     private Flux<ObjectNode> left;
     private Flux<ObjectNode> right;
 
@@ -57,6 +60,8 @@ public class FluxMergeJoinTest {
                 Arrays.asList(
                         om.readTree(
                                 "{\"a\": {\"customerId\": \"1\", \"numberOfInquiries\": 1}}"
+                        ), om.readTree(
+                                "{\"a\": {\"customerId\": \"1\", \"numberOfInquiries\": 9}}"
                         ), om.readTree(
                                 "{\"a\": {\"customerId\": \"5\", \"numberOfInquiries\": 2}}"
                         ), om.readTree(
@@ -84,7 +89,9 @@ public class FluxMergeJoinTest {
                         om.readTree(
                                 "{\"b\": {\"customerId\": \"1\", \"numberOfInquiries\": 3}}"
                         ), om.readTree(
-                                "{\"b\": {\"customerId\": \"3\", \"numberOfInquiries\": 6}}"
+                                "{\"b\": {\"customerId\": \"1\", \"numberOfInquiries\": 6}}"
+                        ), om.readTree(
+                                "{\"b\": {\"customerId\": \"3\", \"numberOfInquiries\": 8}}"
                         ), om.readTree(
                                 "{\"b\": {\"customerId\": \"5\", \"numberOfInquiries\": 7}}"
                         )
@@ -107,98 +114,158 @@ public class FluxMergeJoinTest {
 
     @Test
     public void testInnerJoin() throws JsonMappingException, JsonProcessingException {
-        var om = new ObjectMapper();
 
         final var predicate = NodePredicate.alwaysTrue();
 
-        var result = FluxMergeJoin.innerJoin(
-                comparator, predicate, left, right
-        ).collectList().block();
-        System.out.println(
-                "INNER_JOIN: " + om.valueToTree(
-                        result
-                ).toPrettyString()
-        );
+        //Validate results with StepVerifier
+        StepVerifier.create(
+                FluxMergeJoin.innerJoin(comparator, predicate, left, right)
+        ).recordWith(
+                ArrayList::new
+        ).expectNext(
+                om.readValue("{\"a\":{\"customerId\":\"1\",\"numberOfInquiries\":1},\"b\":{\"customerId\":\"1\",\"numberOfInquiries\":3}}", ObjectNode.class),
+                om.readValue("{\"a\":{\"customerId\":\"1\",\"numberOfInquiries\":1},\"b\":{\"customerId\":\"1\",\"numberOfInquiries\":6}}", ObjectNode.class),
+                om.readValue("{\"a\":{\"customerId\":\"1\",\"numberOfInquiries\":9},\"b\":{\"customerId\":\"1\",\"numberOfInquiries\":3}}", ObjectNode.class),
+                om.readValue("{\"a\":{\"customerId\":\"1\",\"numberOfInquiries\":9},\"b\":{\"customerId\":\"1\",\"numberOfInquiries\":6}}", ObjectNode.class),
+                om.readValue("{\"a\":{\"customerId\":\"5\",\"numberOfInquiries\":2},\"b\":{\"customerId\":\"5\",\"numberOfInquiries\":7}}", ObjectNode.class)                
+        ).consumeRecordedWith(
+                //Log results
+                result -> {
+                        result.forEach(item -> System.out.println("INNER_JOIN ITEM: " + om.valueToTree(item).toPrettyString()));
+                }
+        ).verifyComplete();
     }
 
     @Test
-    public void testLeftOuterJoin() throws JsonMappingException, JsonProcessingException {
-        var om = new ObjectMapper();
+    public void testLeftOuterJoin() throws JsonMappingException, JsonProcessingException {        
 
         final var predicate = NodePredicate.alwaysTrue();
 
-        var result = FluxMergeJoin.leftOuterJoin(
-                comparator, predicate, left, right
-        ).collectList().block();
-        System.out.println(
-                "LEFT_OUTER_JOIN: " + om.valueToTree(
-                        result
-                ).toPrettyString()
-        );
+        StepVerifier.create(
+                FluxMergeJoin.leftOuterJoin(comparator, predicate, left, right)
+        ).recordWith(
+                ArrayList::new
+        ).expectNext(                
+                om.readValue("{\"a\":{\"customerId\":\"1\",\"numberOfInquiries\":1},\"b\":{\"customerId\":\"1\",\"numberOfInquiries\":3}}", ObjectNode.class),
+                om.readValue("{\"a\":{\"customerId\":\"1\",\"numberOfInquiries\":1},\"b\":{\"customerId\":\"1\",\"numberOfInquiries\":6}}", ObjectNode.class),
+                om.readValue("{\"a\":{\"customerId\":\"1\",\"numberOfInquiries\":9},\"b\":{\"customerId\":\"1\",\"numberOfInquiries\":3}}", ObjectNode.class),
+                om.readValue("{\"a\":{\"customerId\":\"1\",\"numberOfInquiries\":9},\"b\":{\"customerId\":\"1\",\"numberOfInquiries\":6}}", ObjectNode.class),
+                om.readValue("{\"a\":{\"customerId\":\"2\",\"numberOfInquiries\":4}}", ObjectNode.class),
+                om.readValue("{\"a\":{\"customerId\":\"5\",\"numberOfInquiries\":2},\"b\":{\"customerId\":\"5\",\"numberOfInquiries\":7}}", ObjectNode.class),
+                om.readValue("{\"a\":{\"customerId\":\"6\",\"numberOfInquiries\":5}}", ObjectNode.class)              
+        ).consumeRecordedWith(
+                //Log results
+                result -> {
+                        result.forEach(item -> System.out
+                                .println("LEFT_OUTER_JOIN ITEM: " + om.valueToTree(item).toPrettyString()));
+                }
+        ).verifyComplete();
     }
 
-	@Test
+    @Test
     public void testFullOuterJoin() throws JsonMappingException, JsonProcessingException {
-        var om = new ObjectMapper();
 
         final var predicate = NodePredicate.alwaysTrue();
 
-        var result = FluxMergeJoin.fullOuterJoin(
-                comparator, predicate, left, right
-        ).collectList().block();
-        System.out.println(
-                "FULL_OUTER_JOIN: " + om.valueToTree(
-                        result
-                ).toPrettyString()
-        );
+        StepVerifier.create(
+                FluxMergeJoin.fullOuterJoin(
+                        comparator, predicate, left, right
+                )
+        ).recordWith(
+                ArrayList::new
+        ).expectNext(                
+                om.readValue("{\"a\":{\"customerId\":\"1\",\"numberOfInquiries\":1},\"b\":{\"customerId\":\"1\",\"numberOfInquiries\":3}}", ObjectNode.class),
+                om.readValue("{\"a\":{\"customerId\":\"1\",\"numberOfInquiries\":1},\"b\":{\"customerId\":\"1\",\"numberOfInquiries\":6}}", ObjectNode.class),
+                om.readValue("{\"a\":{\"customerId\":\"1\",\"numberOfInquiries\":9},\"b\":{\"customerId\":\"1\",\"numberOfInquiries\":3}}", ObjectNode.class),
+                om.readValue("{\"a\":{\"customerId\":\"1\",\"numberOfInquiries\":9},\"b\":{\"customerId\":\"1\",\"numberOfInquiries\":6}}", ObjectNode.class),
+                om.readValue("{\"a\":{\"customerId\":\"2\",\"numberOfInquiries\":4}}", ObjectNode.class),
+                om.readValue("{\"b\":{\"customerId\":\"3\",\"numberOfInquiries\":8}}", ObjectNode.class),
+                om.readValue("{\"a\":{\"customerId\":\"5\",\"numberOfInquiries\":2},\"b\":{\"customerId\":\"5\",\"numberOfInquiries\":7}}", ObjectNode.class),
+                om.readValue("{\"a\":{\"customerId\":\"6\",\"numberOfInquiries\":5}}", ObjectNode.class)
+        ).consumeRecordedWith(
+                //Log results
+                result -> {
+                        result.forEach(item -> System.out
+                                .println("FULL_OUTER_JOIN ITEM: " + om.valueToTree(item).toPrettyString()));
+                }
+        ).verifyComplete();
     }
 
-	@Test
+    @Test
     public void testRightOuterJoin() throws JsonMappingException, JsonProcessingException {
-        var om = new ObjectMapper();
-
+ 
         final var predicate = NodePredicate.alwaysTrue();
 
-        var result = FluxMergeJoin.rightOuterJoin(
-                comparator, predicate, left, right
-        ).collectList().block();
-        System.out.println(
-                "RIGHT_OUTER_JOIN: " + om.valueToTree(
-                        result
-                ).toPrettyString()
-        );
+        StepVerifier.create(
+                FluxMergeJoin.rightOuterJoin(
+                        comparator, predicate, left, right
+                )
+        ).recordWith(
+                ArrayList::new
+        ).expectNext(                
+                om.readValue("{\"a\":{\"customerId\":\"1\",\"numberOfInquiries\":1},\"b\":{\"customerId\":\"1\",\"numberOfInquiries\":3}}", ObjectNode.class),
+                om.readValue("{\"a\":{\"customerId\":\"1\",\"numberOfInquiries\":1},\"b\":{\"customerId\":\"1\",\"numberOfInquiries\":6}}", ObjectNode.class),
+                om.readValue("{\"a\":{\"customerId\":\"1\",\"numberOfInquiries\":9},\"b\":{\"customerId\":\"1\",\"numberOfInquiries\":3}}", ObjectNode.class),
+                om.readValue("{\"a\":{\"customerId\":\"1\",\"numberOfInquiries\":9},\"b\":{\"customerId\":\"1\",\"numberOfInquiries\":6}}", ObjectNode.class),
+                om.readValue("{\"b\":{\"customerId\":\"3\",\"numberOfInquiries\":8}}", ObjectNode.class),
+                om.readValue("{\"a\":{\"customerId\":\"5\",\"numberOfInquiries\":2},\"b\":{\"customerId\":\"5\",\"numberOfInquiries\":7}}", ObjectNode.class)
+        ).consumeRecordedWith(
+                //Log results
+                result -> {
+                        result.forEach(item -> System.out
+                                .println("RIGHT_OUTER_JOIN ITEM: " + om.valueToTree(item).toPrettyString()));
+                }
+        ).verifyComplete();
     }
 
-	@Test
+    @Test
     public void testLeftSemiJoin() throws JsonMappingException, JsonProcessingException {
-        var om = new ObjectMapper();
 
         final var predicate = NodePredicate.alwaysTrue();
 
-        var result = FluxMergeJoin.leftSemiJoin(
-                comparator, predicate, left, right
-        ).collectList().block();
-        System.out.println(
-                "LEFT_SEMI_JOIN: " + om.valueToTree(
-                        result
-                ).toPrettyString()
-        );
+        StepVerifier.create(
+                FluxMergeJoin.leftSemiJoin(
+                        comparator, predicate, left, right
+                )
+        ).recordWith(
+                ArrayList::new
+        ).expectNext(                
+                om.readValue("{\"a\":{\"customerId\":\"1\",\"numberOfInquiries\":1}}", ObjectNode.class),
+                om.readValue("{\"a\":{\"customerId\":\"1\",\"numberOfInquiries\":1}}", ObjectNode.class),
+                om.readValue("{\"a\":{\"customerId\":\"1\",\"numberOfInquiries\":9}}", ObjectNode.class),
+                om.readValue("{\"a\":{\"customerId\":\"1\",\"numberOfInquiries\":9}}", ObjectNode.class),
+                om.readValue("{\"a\":{\"customerId\":\"5\",\"numberOfInquiries\":2}}", ObjectNode.class)
+        ).consumeRecordedWith(
+                //Log results
+                result -> {
+                        result.forEach(item -> System.out
+                                .println("LEFT_SEMI_JOIN ITEM: " + om.valueToTree(item).toPrettyString()));
+                }
+        ).verifyComplete();
     }
 
-	@Test
-    public void testRightSemiJoin() throws JsonMappingException, JsonProcessingException {
-        var om = new ObjectMapper();
+    @Test
+    public void testRightSemiJoin() throws JsonMappingException, JsonProcessingException {        
 
         final var predicate = NodePredicate.alwaysTrue();
 
-        var result = FluxMergeJoin.rightSemiJoin(
-                comparator, predicate, left, right
-        ).collectList().block();
-        System.out.println(
-                "RIGHT_SEMI_JOIN: " + om.valueToTree(
-                        result
-                ).toPrettyString()
-        );
+        StepVerifier.create(
+                FluxMergeJoin.rightSemiJoin(
+                        comparator, predicate, left, right
+                )
+        ).recordWith(
+                ArrayList::new
+        ).expectNext(                
+                om.readValue("{\"b\":{\"customerId\":\"1\",\"numberOfInquiries\":3}}", ObjectNode.class),
+                om.readValue("{\"b\":{\"customerId\":\"1\",\"numberOfInquiries\":6}}", ObjectNode.class),
+                om.readValue("{\"b\":{\"customerId\":\"1\",\"numberOfInquiries\":3}}", ObjectNode.class),
+                om.readValue("{\"b\":{\"customerId\":\"1\",\"numberOfInquiries\":6}}", ObjectNode.class)
+        ).consumeRecordedWith(
+                //Log results
+                result -> {
+                        result.forEach(item -> System.out
+                                .println("RIGHT_SEMI_JOIN ITEM: " + om.valueToTree(item).toPrettyString()));
+                }
+        ).verifyComplete();
     }
-
 }
